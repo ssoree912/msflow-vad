@@ -7,7 +7,9 @@ from torch.utils.data import Dataset
 from torchvision import transforms as T
 from torchvision.transforms import InterpolationMode
 
-__all__ = ('MVTecDataset', )
+IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp')
+
+__all__ = ('MVTecDataset', 'VisADataset', 'ShanghaiTechDataset')
 
 MVTEC_CLASS_NAMES = ['bottle', 'cable', 'capsule', 'carpet', 'grid',
                'hazelnut', 'leather', 'metal_nut', 'pill', 'screw',
@@ -174,3 +176,95 @@ class VisADataset(Dataset):
         assert len(x) == len(y), 'number of x and y should be same'
 
         return list(x), list(y), list(mask)
+
+
+class ShanghaiTechDataset(Dataset):
+    """Dataset loader for ShanghaiTech-style frame data.
+
+    Expected layout under c.data_path:
+    - training/frames/<video_id>/*.png|jpg  (all normal)
+    - testing/frames/<video_id>/*.png|jpg
+    - testing/test_frame_mask/<video_id>.npy  (frame-level 0/1 labels)
+    - testing/test_pixel_mask/<video_id>/*.png (pixel masks, optional)
+    """
+    def __init__(self, c, is_train=True):
+        self.dataset_path = c.data_path
+        self.is_train = is_train
+        self.input_size = c.input_size
+        self.transform_x = T.Compose([
+            T.Resize(c.input_size, InterpolationMode.LANCZOS),
+            T.ToTensor()])
+        self.transform_mask = T.Compose([
+            T.Resize(c.input_size, InterpolationMode.NEAREST),
+            T.ToTensor()])
+        self.normalize = T.Compose([T.Normalize(c.img_mean, c.img_std)])
+
+        self.x, self.y, self.mask = self.load_dataset_folder()
+
+    def __getitem__(self, idx):
+        x_path, y, mask_path = self.x[idx], self.y[idx], self.mask[idx]
+        x = Image.open(x_path).convert('RGB')
+        x = self.normalize(self.transform_x(x))
+
+        if mask_path is None or y == 0:
+            mask = torch.zeros([1, *self.input_size])
+        else:
+            mask_img = Image.open(mask_path)
+            mask = self.transform_mask(mask_img)
+        return x, y, mask
+
+    def __len__(self):
+        return len(self.x)
+
+    def load_dataset_folder(self):
+        if self.is_train:
+            frame_root = os.path.join(self.dataset_path, 'training', 'frames')
+            video_dirs = [d for d in sorted(os.listdir(frame_root))
+                          if os.path.isdir(os.path.join(frame_root, d))]
+            x, y, mask = [], [], []
+            for vid in video_dirs:
+                vid_dir = os.path.join(frame_root, vid)
+                frame_paths = self._sorted_frames(vid_dir)
+                x.extend(frame_paths)
+                y.extend([0] * len(frame_paths))
+                mask.extend([None] * len(frame_paths))
+            return x, y, mask
+
+        # test split
+        frame_root = os.path.join(self.dataset_path, 'testing', 'frames')
+        frame_mask_root = os.path.join(self.dataset_path, 'testing', 'test_frame_mask')
+        pixel_mask_root = os.path.join(self.dataset_path, 'testing', 'test_pixel_mask')
+
+        video_dirs = [d for d in sorted(os.listdir(frame_root))
+                      if os.path.isdir(os.path.join(frame_root, d))]
+        x, y, mask = [], [], []
+        for vid in video_dirs:
+            vid_dir = os.path.join(frame_root, vid)
+            frame_paths = self._sorted_frames(vid_dir)
+            label_path = os.path.join(frame_mask_root, f'{vid}.npy')
+            frame_labels = np.load(label_path)
+            if len(frame_labels) != len(frame_paths):
+                raise ValueError(f'Frame count/label mismatch for {vid}: {len(frame_paths)} frames vs {len(frame_labels)} labels')
+
+            pixel_mask_dir = os.path.join(pixel_mask_root, vid)
+            pixel_mask_map = {}
+            if os.path.isdir(pixel_mask_dir):
+                for fname in os.listdir(pixel_mask_dir):
+                    if os.path.splitext(fname)[1].lower() in IMAGE_EXTENSIONS:
+                        key = os.path.splitext(fname)[0]
+                        pixel_mask_map[key] = os.path.join(pixel_mask_dir, fname)
+
+            for frame_path, label in zip(frame_paths, frame_labels):
+                base = os.path.splitext(os.path.basename(frame_path))[0]
+                mask_path = pixel_mask_map.get(base)
+                x.append(frame_path)
+                y.append(int(label))
+                mask.append(mask_path)
+
+        assert len(x) == len(y), 'number of x and y should be same'
+        return x, y, mask
+
+    def _sorted_frames(self, video_dir):
+        frames = [os.path.join(video_dir, f) for f in os.listdir(video_dir)
+                  if os.path.splitext(f)[1].lower() in IMAGE_EXTENSIONS]
+        return sorted(frames)

@@ -23,7 +23,7 @@ workers = 4
 
 
 # dataset
-dataset = 'mvtec' # [mvtec, visa]
+dataset = 'mvtec' # [mvtec, visa, shanghaitech]
 class_name = 'bottle'
 input_size = (512, 512)
 img_mean, img_std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]

@@ -6,10 +6,9 @@ import wandb
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.cuda.amp import autocast, GradScaler
 
-from datasets import MVTecDataset, VisADataset
+from datasets import MVTecDataset, VisADataset, ShanghaiTechDataset
 from models.extractors import build_extractor
 from models.flow_models import build_msflow_model
 from post_process import post_process
@@ -137,7 +136,14 @@ def train(c):
             group=c.version_name,
             name=c.class_name)
     
-    Dataset = MVTecDataset if c.dataset == 'mvtec' else VisADataset
+    dataset_factory = {
+        'mvtec': MVTecDataset,
+        'visa': VisADataset,
+        'shanghaitech': ShanghaiTechDataset
+    }
+    if c.dataset not in dataset_factory:
+        raise ValueError(f'Unsupported dataset: {c.dataset}')
+    Dataset = dataset_factory[c.dataset]
 
     train_dataset = Dataset(c, is_train=True)
     test_dataset  = Dataset(c, is_train=False)

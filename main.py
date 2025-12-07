@@ -16,7 +16,7 @@ def init_seeds(seed=0):
 def parsing_args(c):
     parser = argparse.ArgumentParser(description='msflow')
     parser.add_argument('--dataset', default='mvtec', type=str, 
-                        choices=['mvtec', 'visa'], help='dataset name')
+                        choices=['mvtec', 'visa', 'shanghaitech'], help='dataset name')
     parser.add_argument('--mode', default='train', type=str, 
                         help='train or test.')
     parser.add_argument('--amp_enable', action='store_true', default=False, 
@@ -63,8 +63,15 @@ def parsing_args(c):
         setattr(c, 'data_path', './data/VisA_pytorch/1cls')
         if c.class_names == ['all']:
             setattr(c, 'class_names', VISA_CLASS_NAMES)
-        
-    c.input_size = (256, 256) if c.class_name == 'transistor' else (512, 512)
+    elif c.dataset == 'shanghaitech':
+        setattr(c, 'data_path', './data/ShanghaiTech')
+        if c.class_names == ['all']:
+            setattr(c, 'class_names', ['shanghaitech'])
+
+    if c.dataset == 'shanghaitech':
+        c.input_size = (256, 256)
+    else:
+        c.input_size = (256, 256) if c.class_name == 'transistor' else (512, 512)
 
     return c
 
@@ -75,6 +82,12 @@ def main(c):
     print(c.class_names)
     for class_name in c.class_names:
         c.class_name = class_name
+        if c.dataset == 'mvtec' and c.class_name == 'transistor':
+            c.input_size = (256, 256)
+        elif c.dataset == 'shanghaitech':
+            c.input_size = (256, 256)
+        else:
+            c.input_size = (512, 512)
         print('-+'*5, class_name, '+-'*5)
         c.ckpt_dir = os.path.join(c.work_dir, c.version_name, c.dataset, c.class_name)
         train(c)
