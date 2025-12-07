@@ -152,7 +152,21 @@ def train(c):
 
     extractor, output_channels = build_extractor(c)
     extractor = extractor.to(c.device).eval()
-    parallel_flows, fusion_flow = build_msflow_model(c, output_channels)
+    # infer spatial sizes after pooling to configure flows
+    if c.pool_type == 'avg':
+        pool_layer = nn.AvgPool2d(3, 2, 1)
+    elif c.pool_type == 'max':
+        pool_layer = nn.MaxPool2d(3, 2, 1)
+    else:
+        pool_layer = nn.Identity()
+    with torch.no_grad():
+        dummy = torch.zeros(1, 3, *c.input_size, device=c.device)
+        h_list = extractor(dummy)
+        spatial_hw_list = []
+        for h in h_list:
+            y = pool_layer(h)
+            spatial_hw_list.append(tuple(y.shape[-2:]))
+    parallel_flows, fusion_flow = build_msflow_model(c, output_channels, spatial_hw_list)
     parallel_flows = [parallel_flow.to(c.device) for parallel_flow in parallel_flows]
     fusion_flow = fusion_flow.to(c.device)
     # if c.wandb_enable:

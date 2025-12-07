@@ -64,7 +64,7 @@ def parsing_args(c):
         if c.class_names == ['all']:
             setattr(c, 'class_names', VISA_CLASS_NAMES)
     elif c.dataset == 'shanghaitech':
-        setattr(c, 'data_path', './data/ShanghaiTech')
+        setattr(c, 'data_path', './data/shanghaitech')
         if c.class_names == ['all']:
             setattr(c, 'class_names', ['shanghaitech'])
 

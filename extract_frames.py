@@ -7,7 +7,7 @@ from pathlib import Path
 def extract_video(video_path: Path, output_dir: Path, fps: str = None, overwrite: bool = False):
     output_dir.mkdir(parents=True, exist_ok=True)
     pattern = output_dir / "frame_%06d.png"
-    cmd = ["ffmpeg", "-i", str(video_path)]
+    cmd = ["ffmpeg", "-hide_banner", "-loglevel", "warning", "-i", str(video_path)]
     if fps:
         cmd.extend(["-vf", f"fps={fps}"])
     if overwrite:
