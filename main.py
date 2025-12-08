@@ -14,6 +14,8 @@ def init_seeds(seed=0):
     torch.cuda.manual_seed_all(seed)
 
 def parsing_args(c):
+    data_path_default = getattr(c, 'data_path', None)
+    workers_default = getattr(c, 'workers', 4)
     parser = argparse.ArgumentParser(description='msflow')
     parser.add_argument('--dataset', default='mvtec', type=str, 
                         choices=['mvtec', 'visa', 'shanghaitech', 'rail'], help='dataset name')
@@ -33,6 +35,14 @@ def parsing_args(c):
                         help='learning rate')
     parser.add_argument('--batch-size', default=8, type=int, 
                         help='train batch size')
+    parser.add_argument('--workers', default=workers_default, type=int,
+                        help='dataloader workers (override default)')
+    parser.add_argument('--data-path', default=data_path_default, type=str,
+                        help='dataset root path (override default)')
+    parser.add_argument('--train-fraction', default=1.0, type=float,
+                        help='use first fraction of training data (0<frac<=1)')
+    parser.add_argument('--test-limit', default=None, type=int,
+                        help='limit number of test samples (use first N)')
     parser.add_argument('--meta-epochs', default=25, type=int,
                         help='number of meta epochs to train')
     parser.add_argument('--sub-epochs', default=4, type=int,
@@ -53,23 +63,29 @@ def parsing_args(c):
     for k, v in vars(args).items():
         setattr(c, k, v)
     
-    if c.dataset == 'mvtec':
-        from datasets import MVTEC_CLASS_NAMES
-        setattr(c, 'data_path', './data/MVTec')
-        if c.class_names == ['all']:
-            setattr(c, 'class_names', MVTEC_CLASS_NAMES)
-    elif c.dataset == 'visa':
-        from datasets import VISA_CLASS_NAMES
-        setattr(c, 'data_path', './data/VisA_pytorch/1cls')
-        if c.class_names == ['all']:
-            setattr(c, 'class_names', VISA_CLASS_NAMES)
-    elif c.dataset == 'shanghaitech':
-        setattr(c, 'data_path', './data/shanghaitech')
-        if c.class_names == ['all']:
-            setattr(c, 'class_names', ['shanghaitech'])
-    elif c.dataset == 'rail':
-        setattr(c, 'data_path', './data/rail/rail_uvad_dataset')
-        if c.class_names == ['all']:
+    # set data_path and class_names defaults if not provided
+    if c.data_path is None:
+        if c.dataset == 'mvtec':
+            from datasets import MVTEC_CLASS_NAMES
+            setattr(c, 'data_path', './data/MVTec')
+            if c.class_names == ['all']:
+                setattr(c, 'class_names', MVTEC_CLASS_NAMES)
+        elif c.dataset == 'visa':
+            from datasets import VISA_CLASS_NAMES
+            setattr(c, 'data_path', './data/VisA_pytorch/1cls')
+            if c.class_names == ['all']:
+                setattr(c, 'class_names', VISA_CLASS_NAMES)
+        elif c.dataset == 'shanghaitech':
+            setattr(c, 'data_path', './data/shanghaitech')
+            if c.class_names == ['all']:
+                setattr(c, 'class_names', ['shanghaitech'])
+        elif c.dataset == 'rail':
+            setattr(c, 'data_path', './data/rail/rail_uvad_dataset')
+            if c.class_names == ['all']:
+                setattr(c, 'class_names', ['rail'])
+    else:
+        # custom data_path; ensure class_names default for rail
+        if c.dataset == 'rail' and c.class_names == ['all']:
             setattr(c, 'class_names', ['rail'])
 
     if c.dataset in ['shanghaitech', 'rail']:

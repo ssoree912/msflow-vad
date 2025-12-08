@@ -150,6 +150,14 @@ def train(c):
 
     train_dataset = Dataset(c, is_train=True)
     test_dataset  = Dataset(c, is_train=False)
+    if hasattr(c, 'train_fraction') and c.train_fraction < 1.0:
+        keep = int(len(train_dataset) * c.train_fraction)
+        train_dataset = torch.utils.data.Subset(train_dataset, list(range(keep)))
+        print(f"[DATA] using fraction {c.train_fraction:.2f} -> train subset size {keep}")
+    if hasattr(c, 'test_limit') and c.test_limit:
+        keep_t = min(c.test_limit, len(test_dataset))
+        test_dataset = torch.utils.data.Subset(test_dataset, list(range(keep_t)))
+        print(f"[DATA] using test limit {keep_t}")
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=c.batch_size, shuffle=True, num_workers=c.workers, pin_memory=True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=c.batch_size, shuffle=False, num_workers=c.workers, pin_memory=True)
     print(f"[DATA] train={len(train_dataset)} images, test={len(test_dataset)} images, "
