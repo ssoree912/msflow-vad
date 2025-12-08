@@ -3,6 +3,7 @@ import time
 import datetime
 import numpy as np
 import wandb
+from tqdm import tqdm
 
 import torch
 import torch.nn as nn
@@ -47,7 +48,8 @@ def train_meta_epoch(c, epoch, loader, extractor, parallel_flows, fusion_flow, p
     for sub_epoch in range(c.sub_epochs):
         epoch_loss = 0.
         image_count = 0
-        for idx, (image, _, _) in enumerate(loader):
+        total_batches = len(loader)
+        for idx, (image, _, _) in enumerate(tqdm(loader, total=total_batches, desc=f"train {epoch}.{sub_epoch}", leave=False, mininterval=5)):
             optimizer.zero_grad()
             image = image.to(c.device)
             if scaler:
@@ -110,7 +112,7 @@ def inference_meta_epoch(c, epoch, loader, extractor, parallel_flows, fusion_flo
                 if idx == 0:
                     size_list.append(list(z.shape[-2:]))
                 logp = - 0.5 * torch.mean(z**2, 1)
-                outputs_list[lvl].append(logp)
+                outputs_list[lvl].append(logp.cpu())
                 loss += 0.5 * torch.sum(z**2, (1, 2, 3))
 
             loss = loss - jac
@@ -149,6 +151,8 @@ def train(c):
     test_dataset  = Dataset(c, is_train=False)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=c.batch_size, shuffle=True, num_workers=c.workers, pin_memory=True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=c.batch_size, shuffle=False, num_workers=c.workers, pin_memory=True)
+    print(f"[DATA] train={len(train_dataset)} images, test={len(test_dataset)} images, "
+          f"batches_per_epoch={len(train_loader)}, batch_size={c.batch_size}, workers={c.workers}")
 
     extractor, output_channels = build_extractor(c)
     extractor = extractor.to(c.device).eval()
