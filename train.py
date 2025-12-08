@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 from torch.cuda.amp import autocast, GradScaler
 
-from datasets import MVTecDataset, VisADataset, ShanghaiTechDataset
+from datasets import MVTecDataset, VisADataset, ShanghaiTechDataset, RailDataset
 from models.extractors import build_extractor
 from models.flow_models import build_msflow_model
 from post_process import post_process
@@ -141,7 +141,8 @@ def train(c):
     dataset_factory = {
         'mvtec': MVTecDataset,
         'visa': VisADataset,
-        'shanghaitech': ShanghaiTechDataset
+        'shanghaitech': ShanghaiTechDataset,
+        'rail': RailDataset
     }
     if c.dataset not in dataset_factory:
         raise ValueError(f'Unsupported dataset: {c.dataset}')

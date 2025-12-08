@@ -9,7 +9,7 @@ from torchvision.transforms import InterpolationMode
 
 IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp')
 
-__all__ = ('MVTecDataset', 'VisADataset', 'ShanghaiTechDataset')
+__all__ = ('MVTecDataset', 'VisADataset', 'ShanghaiTechDataset', 'RailDataset')
 
 MVTEC_CLASS_NAMES = ['bottle', 'cable', 'capsule', 'carpet', 'grid',
                'hazelnut', 'leather', 'metal_nut', 'pill', 'screw',
@@ -268,3 +268,78 @@ class ShanghaiTechDataset(Dataset):
         frames = [os.path.join(video_dir, f) for f in os.listdir(video_dir)
                   if os.path.splitext(f)[1].lower() in IMAGE_EXTENSIONS]
         return sorted(frames)
+
+class RailDataset(Dataset):
+    """Dataset loader for rail UVAD frames.
+
+    Expected layout under c.data_path:
+      normal_frames/*.jpg|png
+      anomaly_frames/*.jpg|png
+      anomaly_masks/*.jpg|png   (same basename as anomaly frame)
+    Train: only normal_frames.
+    Test: normal_frames + anomaly_frames (anomaly uses masks if present).
+    """
+    def __init__(self, c, is_train=True):
+        self.dataset_path = c.data_path
+        self.is_train = is_train
+        self.input_size = c.input_size
+        self.transform_x = T.Compose([
+            T.Resize(c.input_size, InterpolationMode.LANCZOS),
+            T.ToTensor()])
+        self.transform_mask = T.Compose([
+            T.Resize(c.input_size, InterpolationMode.NEAREST),
+            T.ToTensor()])
+        self.normalize = T.Compose([T.Normalize(c.img_mean, c.img_std)])
+
+        self.x, self.y, self.mask = self.load_dataset_folder()
+
+    def __getitem__(self, idx):
+        img_path, label, mask_path = self.x[idx], self.y[idx], self.mask[idx]
+        x = Image.open(img_path).convert('RGB')
+        x = self.normalize(self.transform_x(x))
+        if label == 0 or mask_path is None:
+            mask = torch.zeros([1, *self.input_size])
+        else:
+            mask_img = Image.open(mask_path)
+            mask = self.transform_mask(mask_img)
+        return x, label, mask
+
+    def __len__(self):
+        return len(self.x)
+
+    def load_dataset_folder(self):
+        normal_dir = os.path.join(self.dataset_path, 'normal_frames')
+        anomaly_dir = os.path.join(self.dataset_path, 'anomaly_frames')
+        mask_dir = os.path.join(self.dataset_path, 'anomaly_masks')
+        x, y, mask = [], [], []
+
+        def list_images(root):
+            return sorted([os.path.join(root, f) for f in os.listdir(root)
+                           if os.path.splitext(f)[1].lower() in IMAGE_EXTENSIONS])
+
+        if self.is_train:
+            normal_imgs = list_images(normal_dir)
+            x.extend(normal_imgs)
+            y.extend([0] * len(normal_imgs))
+            mask.extend([None] * len(normal_imgs))
+            return x, y, mask
+
+        normal_imgs = list_images(normal_dir)
+        x.extend(normal_imgs)
+        y.extend([0] * len(normal_imgs))
+        mask.extend([None] * len(normal_imgs))
+
+        anomaly_imgs = list_images(anomaly_dir)
+        for img_path in anomaly_imgs:
+            base = os.path.splitext(os.path.basename(img_path))[0]
+            mask_path = None
+            for ext in IMAGE_EXTENSIONS:
+                cand = os.path.join(mask_dir, base + ext)
+                if os.path.exists(cand):
+                    mask_path = cand
+                    break
+            x.append(img_path)
+            y.append(1)
+            mask.append(mask_path)
+
+        return x, y, mask

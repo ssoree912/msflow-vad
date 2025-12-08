@@ -16,7 +16,7 @@ def init_seeds(seed=0):
 def parsing_args(c):
     parser = argparse.ArgumentParser(description='msflow')
     parser.add_argument('--dataset', default='mvtec', type=str, 
-                        choices=['mvtec', 'visa', 'shanghaitech'], help='dataset name')
+                        choices=['mvtec', 'visa', 'shanghaitech', 'rail'], help='dataset name')
     parser.add_argument('--mode', default='train', type=str, 
                         help='train or test.')
     parser.add_argument('--amp_enable', action='store_true', default=False, 
@@ -67,8 +67,12 @@ def parsing_args(c):
         setattr(c, 'data_path', './data/shanghaitech')
         if c.class_names == ['all']:
             setattr(c, 'class_names', ['shanghaitech'])
+    elif c.dataset == 'rail':
+        setattr(c, 'data_path', './data/rail/rail_uvad_dataset')
+        if c.class_names == ['all']:
+            setattr(c, 'class_names', ['rail'])
 
-    if c.dataset == 'shanghaitech':
+    if c.dataset in ['shanghaitech', 'rail']:
         c.input_size = (256, 256)
     else:
         c.input_size = (256, 256) if c.class_name == 'transistor' else (512, 512)
@@ -84,7 +88,7 @@ def main(c):
         c.class_name = class_name
         if c.dataset == 'mvtec' and c.class_name == 'transistor':
             c.input_size = (256, 256)
-        elif c.dataset == 'shanghaitech':
+        elif c.dataset in ['shanghaitech', 'rail']:
             c.input_size = (256, 256)
         else:
             c.input_size = (512, 512)
