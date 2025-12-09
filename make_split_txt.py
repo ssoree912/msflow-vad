@@ -49,11 +49,12 @@ def main():
         test_anomalies = anomalies[:args.test_anomaly]
 
     # build lines
-    train_lines = [f"{img.relative_to(root)} 0\n" for img in train_normals]
+    # use semicolon separator to be robust to spaces in paths
+    train_lines = [f"{img.relative_to(root)};0\n" for img in train_normals]
 
     test_lines = []
     for img in test_normals:
-        test_lines.append(f"{img.relative_to(root)} 0\n")
+        test_lines.append(f"{img.relative_to(root)};0\n")
 
     for img in test_anomalies:
         base = img.stem
@@ -64,9 +65,9 @@ def main():
                 mask_path = str(cand.relative_to(root))
                 break
         if mask_path:
-            test_lines.append(f"{img.relative_to(root)} 1 {mask_path}\n")
+            test_lines.append(f"{img.relative_to(root)};1;{mask_path}\n")
         else:
-            test_lines.append(f"{img.relative_to(root)} 1\n")
+            test_lines.append(f"{img.relative_to(root)};1\n")
 
     Path(args.train_out).write_text("".join(train_lines))
     Path(args.test_out).write_text("".join(test_lines))

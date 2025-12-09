@@ -369,12 +369,32 @@ class TxtRailDataset(Dataset):
         samples = []
         with open(list_path, 'r') as f:
             for line in f:
-                parts = line.strip().split()
-                if not parts:
+                line = line.strip()
+                if not line:
                     continue
-                img_rel = parts[0]
-                label = int(parts[1])
-                mask_rel = parts[2] if len(parts) > 2 else None
+                mask_rel = None
+                if ';' in line:
+                    parts = line.split(';')
+                    parts = [p.strip() for p in parts if p.strip()]
+                    if len(parts) >= 2:
+                        img_rel = parts[0]
+                        label = int(parts[1])
+                        if len(parts) >= 3:
+                            mask_rel = parts[2]
+                    else:
+                        continue
+                else:
+                    parts = line.split()
+                    if len(parts) < 2:
+                        continue
+                    label = int(parts[-1])
+                    # try to detect mask as second last token if it looks like a file with known ext
+                    maybe_mask = parts[-2] if len(parts) >= 3 else None
+                    if maybe_mask and os.path.splitext(maybe_mask)[1].lower() in IMAGE_EXTENSIONS:
+                        mask_rel = maybe_mask
+                        img_rel = " ".join(parts[:-2])
+                    else:
+                        img_rel = " ".join(parts[:-1])
                 img_path = os.path.join(self.dataset_path, img_rel)
                 mask_path = os.path.join(self.dataset_path, mask_rel) if mask_rel else None
                 samples.append((img_path, label, mask_path))
