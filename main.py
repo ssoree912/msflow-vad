@@ -18,7 +18,7 @@ def parsing_args(c):
     workers_default = getattr(c, 'workers', 4)
     parser = argparse.ArgumentParser(description='msflow')
     parser.add_argument('--dataset', default='mvtec', type=str, 
-                        choices=['mvtec', 'visa', 'shanghaitech', 'rail'], help='dataset name')
+                        choices=['mvtec', 'visa', 'shanghaitech', 'rail', 'rail_txt'], help='dataset name')
     parser.add_argument('--mode', default='train', type=str, 
                         help='train or test.')
     parser.add_argument('--amp_enable', action='store_true', default=False, 
@@ -39,6 +39,10 @@ def parsing_args(c):
                         help='dataloader workers (override default)')
     parser.add_argument('--data-path', default=data_path_default, type=str,
                         help='dataset root path (override default)')
+    parser.add_argument('--train-list', default=None, type=str,
+                        help='train list path (for rail_txt)')
+    parser.add_argument('--test-list', default=None, type=str,
+                        help='test list path (for rail_txt)')
     parser.add_argument('--train-fraction', default=1.0, type=float,
                         help='use first fraction of training data (0<frac<=1)')
     parser.add_argument('--test-limit', default=None, type=int,
@@ -83,12 +87,20 @@ def parsing_args(c):
             setattr(c, 'data_path', './data/rail/rail_uvad_dataset')
             if c.class_names == ['all']:
                 setattr(c, 'class_names', ['rail'])
+        elif c.dataset == 'rail_txt':
+            setattr(c, 'data_path', './data/rail/rail_uvad_dataset')
+            if c.class_names == ['all']:
+                setattr(c, 'class_names', ['rail'])
+            if c.train_list is None:
+                setattr(c, 'train_list', './train.txt')
+            if c.test_list is None:
+                setattr(c, 'test_list', './test.txt')
     else:
         # custom data_path; ensure class_names default for rail
-        if c.dataset == 'rail' and c.class_names == ['all']:
+        if c.dataset in ['rail', 'rail_txt'] and c.class_names == ['all']:
             setattr(c, 'class_names', ['rail'])
 
-    if c.dataset in ['shanghaitech', 'rail']:
+    if c.dataset in ['shanghaitech', 'rail', 'rail_txt']:
         c.input_size = (256, 256)
     else:
         c.input_size = (256, 256) if c.class_name == 'transistor' else (512, 512)
@@ -104,7 +116,7 @@ def main(c):
         c.class_name = class_name
         if c.dataset == 'mvtec' and c.class_name == 'transistor':
             c.input_size = (256, 256)
-        elif c.dataset in ['shanghaitech', 'rail']:
+        elif c.dataset in ['shanghaitech', 'rail', 'rail_txt']:
             c.input_size = (256, 256)
         else:
             c.input_size = (512, 512)

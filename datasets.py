@@ -9,7 +9,7 @@ from torchvision.transforms import InterpolationMode
 
 IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp')
 
-__all__ = ('MVTecDataset', 'VisADataset', 'ShanghaiTechDataset', 'RailDataset')
+__all__ = ('MVTecDataset', 'VisADataset', 'ShanghaiTechDataset', 'RailDataset', 'TxtRailDataset')
 
 MVTEC_CLASS_NAMES = ['bottle', 'cable', 'capsule', 'carpet', 'grid',
                'hazelnut', 'leather', 'metal_nut', 'pill', 'screw',
@@ -343,3 +343,53 @@ class RailDataset(Dataset):
             mask.append(mask_path)
 
         return x, y, mask
+
+
+class TxtRailDataset(Dataset):
+    """Dataset loader that reads samples from train/test txt files.
+
+    Each line: img_path label [mask_path]
+    Paths are relative to c.data_path.
+    """
+    def __init__(self, c, is_train=True):
+        self.dataset_path = c.data_path
+        self.is_train = is_train
+        list_path = c.train_list if is_train else c.test_list
+        self.samples = self._read_list(list_path)
+        self.input_size = c.input_size
+        self.transform_x = T.Compose([
+            T.Resize(c.input_size, InterpolationMode.LANCZOS),
+            T.ToTensor()])
+        self.transform_mask = T.Compose([
+            T.Resize(c.input_size, InterpolationMode.NEAREST),
+            T.ToTensor()])
+        self.normalize = T.Compose([T.Normalize(c.img_mean, c.img_std)])
+
+    def _read_list(self, list_path):
+        samples = []
+        with open(list_path, 'r') as f:
+            for line in f:
+                parts = line.strip().split()
+                if not parts:
+                    continue
+                img_rel = parts[0]
+                label = int(parts[1])
+                mask_rel = parts[2] if len(parts) > 2 else None
+                img_path = os.path.join(self.dataset_path, img_rel)
+                mask_path = os.path.join(self.dataset_path, mask_rel) if mask_rel else None
+                samples.append((img_path, label, mask_path))
+        return samples
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        img_path, label, mask_path = self.samples[idx]
+        x = Image.open(img_path).convert('RGB')
+        x = self.normalize(self.transform_x(x))
+        if label == 0 or not mask_path:
+            mask = torch.zeros([1, *self.input_size])
+        else:
+            mask_img = Image.open(mask_path)
+            mask = self.transform_mask(mask_img)
+        return x, label, mask

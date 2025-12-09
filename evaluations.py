@@ -21,6 +21,9 @@ def eval_loc_auroc(loc_auroc_obs, epoch, gt_mask, anomaly_score_map):
     return loc_auroc, best
 
 def eval_seg_pro(loc_pro_obs, epoch, gt_mask, anomaly_score_map, max_step=800):
+    # If there are no positive pixels in gt, PRO is undefined; return 0.
+    if gt_mask.sum() == 0:
+        return 0.0, False
     expect_fpr = 0.3 # default 30%
     max_th = anomaly_score_map.max()
     min_th = anomaly_score_map.min()
@@ -47,7 +50,7 @@ def eval_seg_pro(loc_pro_obs, epoch, gt_mask, anomaly_score_map, max_step=800):
     return loc_pro_auc, best
 
 def single_process(anomaly_score_map, gt_mask, thred):
-    binary_score_maps = np.zeros_like(anomaly_score_map, dtype=np.bool)
+    binary_score_maps = np.zeros_like(anomaly_score_map, dtype=bool)
     binary_score_maps[anomaly_score_map <= thred] = 0
     binary_score_maps[anomaly_score_map >  thred] = 1
     pro = []
@@ -58,15 +61,15 @@ def single_process(anomaly_score_map, gt_mask, thred):
             tp_pixels = binary_map[axes0_ids, axes1_ids].sum()
             pro.append(tp_pixels / region.area)
 
-    pros_mean = np.array(pro).mean()
+    pros_mean = 0.0 if len(pro) == 0 else np.array(pro).mean()
     inverse_masks = 1 - gt_mask
     fpr = np.logical_and(inverse_masks, binary_score_maps).sum() / inverse_masks.sum()
     return pros_mean, fpr
 
 
 def eval_det_loc(det_auroc_obs, loc_auroc_obs, loc_pro_obs, epoch, gt_label_list, anomaly_score, gt_mask_list, anomaly_score_map_add, anomaly_score_map_mul, pro_eval):
-    gt_label = np.asarray(gt_label_list, dtype=np.bool)
-    gt_mask = np.squeeze(np.asarray(gt_mask_list, dtype=np.bool), axis=1)
+    gt_label = np.asarray(gt_label_list, dtype=bool)
+    gt_mask = np.squeeze(np.asarray(gt_mask_list, dtype=bool), axis=1)
     det_auroc, best_det_auroc = eval_det_auroc(det_auroc_obs, epoch, gt_label, anomaly_score)
     loc_auroc, best_loc_auroc = eval_loc_auroc(loc_auroc_obs, epoch, gt_mask, anomaly_score_map_add)
     if pro_eval:
